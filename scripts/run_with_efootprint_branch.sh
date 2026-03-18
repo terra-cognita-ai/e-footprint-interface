@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BRANCH="${EFOOTPRINT_BRANCH:-ecologits-generic}"
-REPO_URL="${EFOOTPRINT_REPO_URL:-https://github.com/terra-cognita-ai/e-footprint.git}"
 VENDOR_DIR="${EFOOTPRINT_VENDOR_DIR:-.vendor/e-footprint}"
-HOST="${HOST:-0.0.0.0}"
+HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8000}"
 
 if [ ! -f ".env.local" ] && [ ! -f ".env" ]; then
@@ -14,18 +12,20 @@ if [ ! -f ".env.local" ] && [ ! -f ".env" ]; then
 EOF
 fi
 
-mkdir -p "$(dirname "$VENDOR_DIR")"
-
-if [ ! -d "$VENDOR_DIR/.git" ]; then
-  git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$VENDOR_DIR"
-else
-  git -C "$VENDOR_DIR" fetch origin "$BRANCH"
-  git -C "$VENDOR_DIR" checkout "$BRANCH"
-  git -C "$VENDOR_DIR" pull --ff-only
+if [ ! -d "$VENDOR_DIR" ]; then
+  echo "Error: EFOOTPRINT_VENDOR_DIR '$VENDOR_DIR' does not exist."
+  echo "Point EFOOTPRINT_VENDOR_DIR to an existing local e-footprint checkout."
+  exit 1
 fi
 
 export PYTHONPATH="$PWD/$VENDOR_DIR:${PYTHONPATH:-}"
 
-poetry run python manage.py migrate
-poetry run python manage.py createcachetable || true
-poetry run python manage.py runserver "$HOST:$PORT"
+if command -v uv >/dev/null 2>&1; then
+  PY_CMD=(uv run python)
+else
+  PY_CMD=(poetry run python)
+fi
+
+"${PY_CMD[@]}" manage.py migrate
+"${PY_CMD[@]}" manage.py createcachetable || true
+"${PY_CMD[@]}" manage.py runserver "$HOST:$PORT"
